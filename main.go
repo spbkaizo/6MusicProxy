@@ -18,7 +18,8 @@ import (
 
 var client = &http.Client{}
 var tracks []string
-var USER_AGENT = "VLC/3.0.8 LibVLC/3.0.8"
+var useragent = "VLC/3.0.8 LibVLC/3.0.8"
+var tbytes uint64
 
 /*
 type Station int
@@ -52,6 +53,7 @@ func newNetClient() *http.Client {
 				Timeout: 2 * time.Second,
 			}).Dial,
 			TLSHandshakeTimeout: 2 * time.Second,
+			DisableCompression:  true,
 		}
 		netClient = &http.Client{
 			Timeout:   time.Second * 2,
@@ -62,11 +64,26 @@ func newNetClient() *http.Client {
 	return netClient
 }
 
+func ByteCountSI(b uint64) string {
+	const unit = 1000
+	if b < unit {
+		return fmt.Sprintf("%d B", b)
+	}
+	div, exp := int64(unit), 0
+	for n := b / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB",
+		float64(b)/float64(div), "kMGTPE"[exp])
+}
+
 func getContent(u *url.URL) (io.ReadCloser, error) {
 	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
 		log.Printf("ERROR: %v", err)
 	}
+	req.Header.Set("User-Agent", useragent)
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Printf("ERROR: %v", err)
@@ -145,13 +162,15 @@ func download(u *url.URL) {
 	}
 	defer content.Close()
 
-	_, err = io.Copy(out, content)
+	size, err := io.Copy(out, content)
+	tbytes = tbytes + uint64(size)
 	if err != nil {
 		log.Print("cms7> " + err.Error() + "Failed to download " + fileName + "\n")
 	}
 }
 
 func getPlaylist(u *url.URL) {
+	//start := time.Now()
 
 	//cache := lru.New(64)
 
@@ -159,6 +178,9 @@ func getPlaylist(u *url.URL) {
 	if err != nil {
 		log.Fatal("cms9> " + err.Error())
 	}
+
+	//elapsed := time.Since(start)
+	//log.Printf("PLAYLIST: %v completed in %v", path.Base(u.Path), elapsed)
 
 	playlist, listType, err := m3u8.DecodeFrom(content, true)
 	if err != nil {
@@ -174,7 +196,7 @@ func getPlaylist(u *url.URL) {
 	if listType == m3u8.MASTER {
 
 		masterpl := playlist.(*m3u8.MasterPlaylist)
-		for k, variant := range masterpl.Variants {
+		for _, variant := range masterpl.Variants {
 
 			if variant != nil {
 
@@ -183,15 +205,12 @@ func getPlaylist(u *url.URL) {
 					log.Fatal("cms12> " + err.Error())
 				}
 				getPlaylist(msURL)
-
-				log.Print("cms13> "+"Downloaded chunklist number ", k+1, "\n\n")
+				//log.Print("cms13> "+"Downloaded chunklist number ", k+1, "\n\n")
 				//break
 			}
 
 		}
 		writePlaylist(u, m3u8.Playlist(masterpl))
-		log.Print("cms14> "+"Downloaded Master Playlist: ", path.Base(u.Path), "\n")
-		log.Printf("DEBUG: here...")
 		return
 	}
 
@@ -227,7 +246,7 @@ func getPlaylist(u *url.URL) {
 							tracks = append(tracks[:0], tracks[0+1:]...)
 						}
 						//elapsed := time.Since(start)
-						log.Printf("TRACK: %v deleted from disk", file)
+						//log.Printf("TRACK: %v deleted from disk", file)
 					}
 
 					if track == msURL.String() {
@@ -246,7 +265,7 @@ func getPlaylist(u *url.URL) {
 					}
 					elapsed := time.Since(start)
 					//log.Printf("TRACK: %v added to cache/download", msURL.String())
-					log.Printf("TRACK: %v added to cache/downloaded in %v", path.Base(u.Path), elapsed)
+					log.Printf("TRACK: %v downloaded in %v, data total: %v", path.Base(u.Path), elapsed, ByteCountSI(tbytes))
 				}
 				//tracks = append(tracks, msURL.String())
 				//download(msURL)
@@ -272,8 +291,9 @@ func getPlaylist(u *url.URL) {
 
 var OUT_PATH string = "./"
 
-//var IN_URL string = "http://as-hls-uk-live.akamaized.net/pool_904/live/uk/bbc_6music/bbc_6music.isml/bbc_6music-audio%3d320000.norewind.m3u8"
-var IN_URL string = "http://a.files.bbci.co.uk/media/live/manifesto/audio/simulcast/hls/uk/sbr_high/ak/bbc_6music.m3u8"
+var IN_URL string = "http://as-hls-uk-live.akamaized.net/pool_904/live/uk/bbc_6music/bbc_6music.isml/bbc_6music-audio%3d320000.norewind.m3u8"
+
+//var IN_URL string = "http://a.files.bbci.co.uk/media/live/manifesto/audio/simulcast/hls/uk/sbr_high/ak/bbc_6music.m3u8"
 
 //var IN_URL string = "http://makombo.org/cast/media/cmshlstest/master.m3u8"
 //var IN_URL string = "http://makombo.org/cast/media/DevBytes%20Google%20Cast%20SDK_withGDLintro_Apple_HLS_h264_SF_16x9_720p/DevBytes%20Google%20Cast%20SDK_withGDLintro_Apple_HLS_h264_SF_16x9_720p.m3u8"
@@ -293,7 +313,7 @@ func main() {
 	}
 	for {
 		getPlaylist(theURL)
-		time.Sleep(2 * time.Second)
+		time.Sleep(1 * time.Second)
 	}
 
 }
