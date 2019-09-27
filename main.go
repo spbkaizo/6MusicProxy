@@ -21,6 +21,7 @@ var client = &http.Client{}
 var tracks []string
 var useragent = "VLC/3.0.8 LibVLC/3.0.8"
 var tbytes uint64
+var seqnumber uint64
 
 /*
 type Station int
@@ -47,6 +48,8 @@ var (
 	netClient *http.Client
 )
 
+// Create a single client connection, use keepalive to hold open
+// and reduce handshake times...
 func newNetClient() *http.Client {
 	once.Do(func() {
 		var netTransport = &http.Transport{
@@ -65,6 +68,7 @@ func newNetClient() *http.Client {
 	return netClient
 }
 
+// Make log messages print out prettier bytes info...
 func ByteCountSI(b uint64) string {
 	const unit = 1000
 	if b < unit {
@@ -135,23 +139,31 @@ func absolutize(rawurl string, u *url.URL) (uri *url.URL, err error) {
 
 func writePlaylist(u *url.URL, mpl m3u8.Playlist) {
 	fileName := path.Base(u.Path)
+	// Write to a temp file, to avoid the delay of the
+	// m3u8 encoder writing to the main playlist file.
+	// This occasionally leads to a race condition with clients
+	// otherwise.
 	tmpfile, err := ioutil.TempFile("./", fileName+"-")
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	//defer os.Remove(tmpfile.Name()) // clean up
+	//encoderstart := time.Now() // DEBUG
 	if _, err := tmpfile.Write(mpl.Encode().Bytes()); err != nil {
 		log.Fatal(err)
 	}
 	if err := tmpfile.Close(); err != nil {
 		log.Fatal(err)
 	}
+	//log.Printf("DEBUG: File %v written in %v", tmpfile.Name(), time.Since(encoderstart))
 	// Now move the tmp file over the original
+	//start := time.Now()
 	err = os.Rename(tmpfile.Name(), fileName)
 	if err != nil {
 		log.Printf("ERROR: %v", err)
 	}
+	//log.Printf("DEBUG: File %v moved in %v.", tmpfile.Name(), time.Since(start))
 }
 
 func download(u *url.URL) {
@@ -224,77 +236,75 @@ func getPlaylist(u *url.URL) {
 
 	if listType == m3u8.MEDIA {
 		mediapl := playlist.(*m3u8.MediaPlaylist)
-		for _, segment := range mediapl.Segments {
-			if segment != nil {
+		//log.Printf("DEBUG: Playlist %v", mediapl.SeqNo)
+		if mediapl.SeqNo > seqnumber {
+			for _, segment := range mediapl.Segments {
+				if segment != nil {
 
-				msURL, err := absolutize(segment.URI, u)
-				if err != nil {
-					log.Fatal("cms15> " + err.Error())
-				}
-				//log.Printf("new url, %v\n", msURL.String())
-
-				//_, hit := cache.Get(msURL.String())
-				//if !hit {
-				seen := false
-				for _, track := range tracks {
-					if len(tracks) > 12 {
-						u, err := url.Parse(tracks[0])
-						if err != nil {
-							log.Printf("ERROR: %v", err)
-						}
-						//log.Printf("Tracks[0] is %v", tracks[0])
-						// 2019/09/23 19:07:56 u.Path = /pool_904/live/uk/bbc_6music/bbc_6music.isml/bbc_6music-audio=320000-245197198.ts
-						//start := time.Now()
-						file := path.Base(u.Path)
-						//file := strings.TrimPrefix(u.Path, "/pool_904/live/uk/bbc_6music/bbc_6music.isml/")
-						err = os.Remove(file)
-						if err != nil {
-							log.Printf("Error removing stale file %v (%v)", file, err)
-						} else {
-							tracks = append(tracks[:0], tracks[0+1:]...)
-						}
-						//elapsed := time.Since(start)
-						//log.Printf("TRACK: %v deleted from disk", file)
-					}
-
-					if track == msURL.String() {
-						//log.Printf("Already Seen %v", msURL.String())
-						seen = true
-						break
-					}
-				}
-				if seen == false {
-					start := time.Now()
-					tracks = append(tracks, msURL.String())
-					download(msURL)
-					u, err := url.Parse(msURL.String())
+					msURL, err := absolutize(segment.URI, u)
 					if err != nil {
-						log.Printf("Error: %v", err)
+						log.Fatal("cms15> " + err.Error())
 					}
-					elapsed := time.Since(start)
+					//log.Printf("new url, %v\n", msURL.String())
+
+					//_, hit := cache.Get(msURL.String())
+					//if !hit {
+					seen := false
+					for _, track := range tracks {
+						if len(tracks) > 12 {
+							u, err := url.Parse(tracks[0])
+							if err != nil {
+								log.Printf("ERROR: %v", err)
+							}
+							//log.Printf("Tracks[0] is %v", tracks[0])
+							// 2019/09/23 19:07:56 u.Path = /pool_904/live/uk/bbc_6music/bbc_6music.isml/bbc_6music-audio=320000-245197198.ts
+							//start := time.Now()
+							file := path.Base(u.Path)
+							//file := strings.TrimPrefix(u.Path, "/pool_904/live/uk/bbc_6music/bbc_6music.isml/")
+							err = os.Remove(file)
+							if err != nil {
+								log.Printf("Error removing stale file %v (%v)", file, err)
+							} else {
+								tracks = append(tracks[:0], tracks[0+1:]...)
+							}
+							//elapsed := time.Since(start)
+							//log.Printf("TRACK: %v deleted from disk", file)
+						}
+
+						if track == msURL.String() {
+							//log.Printf("Already Seen %v", msURL.String())
+							seen = true
+							break
+						}
+					}
+					if seen == false {
+						start := time.Now()
+						tracks = append(tracks, msURL.String())
+						download(msURL)
+						u, err := url.Parse(msURL.String())
+						if err != nil {
+							log.Printf("Error: %v", err)
+						}
+						elapsed := time.Since(start)
+						//log.Printf("TRACK: %v added to cache/download", msURL.String())
+						log.Printf("TRACK: %v downloaded in %v, data total: %v", path.Base(u.Path), elapsed, ByteCountSI(tbytes))
+					}
+					//tracks = append(tracks, msURL.String())
+					//download(msURL)
 					//log.Printf("TRACK: %v added to cache/download", msURL.String())
-					log.Printf("TRACK: %v downloaded in %v, data total: %v", path.Base(u.Path), elapsed, ByteCountSI(tbytes))
+					//log.Printf("Tracks: %v", tracks)
+					//cache.Add(msURL.String(), nil)
+					//download(msURL)
+					//}
+
 				}
-				//tracks = append(tracks, msURL.String())
-				//download(msURL)
-				//log.Printf("TRACK: %v added to cache/download", msURL.String())
-				//log.Printf("Tracks: %v", tracks)
-				//cache.Add(msURL.String(), nil)
-				//download(msURL)
-				//}
-
 			}
+			//log.Printf("DEBUG writing playlist for seqnumber %v (was %v", mediapl.SeqNo, seqnumber)
+			seqnumber = mediapl.SeqNo
+			writePlaylist(u, m3u8.Playlist(mediapl))
+			//log.Printf("PLAYLIST: SeqNo %v written to disk", seqnumber)
 		}
-
-		writePlaylist(u, m3u8.Playlist(mediapl))
-		//log.Print("cms16> "+"Downloaded Media Playlist: ", path.Base(u.Path))
-
-		//time.Sleep(time.Duration(int64(mediapl.TargetDuration)) * time.Second)
-
 	}
-
-	//time.Sleep(time.Duration(11) * time.Second)
-
 }
 
 var OUT_PATH string = "./"
