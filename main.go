@@ -7,12 +7,12 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/grafov/m3u8"
 	"io"
-	"io/ioutil"
+	//"io/ioutil"
 	"log"
 	"net"
 	"net/http"
 	"net/url"
-	"os"
+	//"os"
 	"path"
 	"path/filepath"
 	"strings"
@@ -27,7 +27,8 @@ var useragent = "VLC/3.0.8 LibVLC/3.0.8"
 var tbytes uint64
 var seqnumber uint64
 var starttime time.Time
-var datadir = "hls/"
+
+//var datadir = "hls/"
 var port string = "8888"
 var currentplist []byte
 var buffers = make(map[string][]byte)
@@ -147,6 +148,7 @@ func absolutize(rawurl string, u *url.URL) (uri *url.URL, err error) {
 	return
 }
 
+/*
 func writePlaylist(u *url.URL, mpl m3u8.Playlist) {
 	fileName := filepath.Base(u.Path)
 	// Write to a temp file, to avoid the delay of the
@@ -175,15 +177,17 @@ func writePlaylist(u *url.URL, mpl m3u8.Playlist) {
 	}
 	//log.Printf("DEBUG: File %v moved in %v.", tmpfile.Name(), time.Since(start))
 }
+*/
 
 func download(u *url.URL) {
 	fileName := path.Base(u.Path)
 
-	out, err := os.Create(datadir + fileName)
+	/*out, err := os.Create(datadir + fileName)
 	if err != nil {
 		log.Fatal("cms5> " + err.Error())
 	}
 	defer out.Close()
+	*/
 
 	content, err := getContent(u)
 	if err != nil {
@@ -195,11 +199,14 @@ func download(u *url.URL) {
 	buf.ReadFrom(content)
 	buffers[fileName] = buf.Bytes()
 
-	size, err := io.Copy(out, content)
-	tbytes = tbytes + uint64(size)
-	if err != nil {
-		log.Print("cms7> " + err.Error() + "Failed to download " + fileName + "\n")
-	}
+	// FIX BYTE COUNT
+	/*
+		size, err := io.Copy(out, content)
+		tbytes = tbytes + uint64(size)
+		if err != nil {
+			log.Print("cms7> " + err.Error() + "Failed to download " + fileName + "\n")
+		}
+	*/
 
 }
 
@@ -244,7 +251,7 @@ func getPlaylist(u *url.URL) {
 			}
 
 		}
-		writePlaylist(u, m3u8.Playlist(masterpl))
+		//writePlaylist(u, m3u8.Playlist(masterpl))
 		return
 	}
 
@@ -274,12 +281,15 @@ func getPlaylist(u *url.URL) {
 							//start := time.Now()
 							file := path.Base(u.Path)
 							//file := strings.TrimPrefix(u.Path, "/pool_904/live/uk/bbc_6music/bbc_6music.isml/")
-							err = os.Remove(datadir + file)
-							if err != nil {
-								log.Printf("Error removing stale file %v (%v)", file, err)
-							} else {
-								tracks = append(tracks[:0], tracks[0+1:]...)
-							}
+							/*
+									err = os.Remove(datadir + file)
+								if err != nil {
+									log.Printf("Error removing stale file %v (%v)", file, err)
+								} else {
+									tracks = append(tracks[:0], tracks[0+1:]...)
+								}
+							*/
+							tracks = append(tracks[:0], tracks[0+1:]...) // keep track of tracks...
 							// map
 							delete(buffers, file)
 							for k, _ := range buffers {
@@ -326,7 +336,7 @@ func getPlaylist(u *url.URL) {
 			seqnumber = mediapl.SeqNo
 			// handle 'u' ?
 			//log.Printf("DEBUG : %v", u.String())
-			writePlaylist(u, m3u8.Playlist(mediapl))
+			//writePlaylist(u, m3u8.Playlist(mediapl))
 			currentplist = m3u8.Playlist(mediapl).Encode().Bytes()
 			//log.Printf("PLAYLIST: SeqNo %v written to disk", seqnumber)
 		}
@@ -383,21 +393,23 @@ func fileHandler(w http.ResponseWriter, req *http.Request) {
 func main() {
 	starttime = time.Now()
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
-	err := os.MkdirAll(datadir, 0755)
-	if err != nil {
-		log.Printf("ERROR: Creating %v data directory (%v)", datadir, err)
-	}
-	// cleanup all stale files matching bbc_6music-audio=320000*
-	files, err := filepath.Glob(datadir + "bbc_6music-audio=320000*")
-	if err != nil {
-		panic(err)
-	}
-	for _, f := range files {
-		if err := os.Remove(f); err != nil {
+	/*
+		err := os.MkdirAll(datadir, 0755)
+		if err != nil {
+			log.Printf("ERROR: Creating %v data directory (%v)", datadir, err)
+		}
+		// cleanup all stale files matching bbc_6music-audio=320000*
+		files, err := filepath.Glob(datadir + "bbc_6music-audio=320000*")
+		if err != nil {
 			panic(err)
 		}
-		log.Printf("INFO: Deleting stale media file %v", f)
-	}
+		for _, f := range files {
+			if err := os.Remove(f); err != nil {
+				panic(err)
+			}
+			log.Printf("INFO: Deleting stale media file %v", f)
+		}
+	*/
 	//log.Printf(Station(1))
 	if !strings.HasPrefix(sourceurl, "http") {
 		log.Fatal("cms17> " + "Playlist URL must begin with http/https")
