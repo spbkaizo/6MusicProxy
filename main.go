@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/grafov/m3u8"
 	"io"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -134,15 +135,22 @@ func absolutize(rawurl string, u *url.URL) (uri *url.URL, err error) {
 
 func writePlaylist(u *url.URL, mpl m3u8.Playlist) {
 	fileName := path.Base(u.Path)
-	out, err := os.Create(OUT_PATH + fileName)
+	tmpfile, err := ioutil.TempFile("./", fileName+"-")
 	if err != nil {
-		log.Fatal("cms3> " + err.Error())
+		log.Fatal(err)
 	}
-	defer out.Close()
 
-	_, err = mpl.Encode().WriteTo(out)
+	//defer os.Remove(tmpfile.Name()) // clean up
+	if _, err := tmpfile.Write(mpl.Encode().Bytes()); err != nil {
+		log.Fatal(err)
+	}
+	if err := tmpfile.Close(); err != nil {
+		log.Fatal(err)
+	}
+	// Now move the tmp file over the original
+	err = os.Rename(tmpfile.Name(), fileName)
 	if err != nil {
-		log.Fatal("cms4> " + err.Error())
+		log.Printf("ERROR: %v", err)
 	}
 }
 
@@ -291,29 +299,22 @@ func getPlaylist(u *url.URL) {
 
 var OUT_PATH string = "./"
 
-var IN_URL string = "http://as-hls-uk-live.akamaized.net/pool_904/live/uk/bbc_6music/bbc_6music.isml/bbc_6music-audio%3d320000.norewind.m3u8"
+var sourceurl string = "http://as-hls-uk-live.akamaized.net/pool_904/live/uk/bbc_6music/bbc_6music.isml/bbc_6music-audio%3d320000.norewind.m3u8"
 
-//var IN_URL string = "http://a.files.bbci.co.uk/media/live/manifesto/audio/simulcast/hls/uk/sbr_high/ak/bbc_6music.m3u8"
-
-//var IN_URL string = "http://makombo.org/cast/media/cmshlstest/master.m3u8"
-//var IN_URL string = "http://makombo.org/cast/media/DevBytes%20Google%20Cast%20SDK_withGDLintro_Apple_HLS_h264_SF_16x9_720p/DevBytes%20Google%20Cast%20SDK_withGDLintro_Apple_HLS_h264_SF_16x9_720p.m3u8"
-//var IN_URL string = "http://makombo.org/cast/media/DevBytes%20Google%20Cast%20SDK_withGDLintro_Apple_HLS_h264_SF_16x9_720p/stream-2-229952/index.m3u8"
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	//log.Printf(Station(1))
-	if !strings.HasPrefix(IN_URL, "http") {
+	if !strings.HasPrefix(sourceurl, "http") {
 		log.Fatal("cms17> " + "Playlist URL must begin with http/https")
 	}
 
-	fmt.Print("\n\n\n")
-
-	theURL, err := url.Parse(IN_URL)
+	target, err := url.Parse(sourceurl)
 	if err != nil {
 		log.Fatal("cms18> " + err.Error())
 	}
 	for {
-		getPlaylist(theURL)
-		time.Sleep(1 * time.Second)
+		getPlaylist(target)
+		time.Sleep(1337 * time.Millisecond)
 	}
 
 }
