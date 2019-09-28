@@ -24,7 +24,7 @@ var sourceurl = "http://as-hls-uk-live.akamaized.net/pool_904/live/uk/bbc_6music
 var client = &http.Client{}
 var tracks []string
 var useragent = "VLC/3.0.8 LibVLC/3.0.8"
-var tbytes uint64
+var tbytes int64
 var seqnumber uint64
 var starttime time.Time
 
@@ -79,7 +79,7 @@ func newNetClient() *http.Client {
 }
 
 // Make log messages print out prettier bytes info...
-func ByteCountSI(b uint64) string {
+func ByteCountSI(b int64) string {
 	const unit = 1000
 	if b < unit {
 		return fmt.Sprintf("%d B", b)
@@ -108,6 +108,7 @@ func getContent(u *url.URL) (io.ReadCloser, error) {
 		return nil, err
 	}
 	//log.Printf("DEBUG: Server Headers: %v", resp.Header)
+	tbytes = tbytes + resp.ContentLength
 	return resp.Body, err
 }
 
@@ -144,40 +145,8 @@ func absolutize(rawurl string, u *url.URL) (uri *url.URL, err error) {
 	if err != nil {
 		return
 	}
-	//log.Printf("DEBUG: uri = %v", uri.String())
 	return
 }
-
-/*
-func writePlaylist(u *url.URL, mpl m3u8.Playlist) {
-	fileName := filepath.Base(u.Path)
-	// Write to a temp file, to avoid the delay of the
-	// m3u8 encoder writing to the main playlist file.
-	// This occasionally leads to a race condition with clients
-	// otherwise.
-	tmpfile, err := ioutil.TempFile(datadir, fileName+"-")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	//defer os.Remove(tmpfile.Name()) // clean up
-	//encoderstart := time.Now() // DEBUG
-	if _, err := tmpfile.Write(mpl.Encode().Bytes()); err != nil {
-		log.Fatal(err)
-	}
-	if err := tmpfile.Close(); err != nil {
-		log.Fatal(err)
-	}
-	//log.Printf("DEBUG: File %v written in %v", tmpfile.Name(), time.Since(encoderstart))
-	// Now move the tmp file over the original
-	//start := time.Now()
-	err = os.Rename(tmpfile.Name(), datadir+fileName)
-	if err != nil {
-		log.Printf("ERROR: %v", err)
-	}
-	//log.Printf("DEBUG: File %v moved in %v.", tmpfile.Name(), time.Since(start))
-}
-*/
 
 func download(u *url.URL) {
 	fileName := path.Base(u.Path)
@@ -257,7 +226,6 @@ func getPlaylist(u *url.URL) {
 
 	if listType == m3u8.MEDIA {
 		mediapl := playlist.(*m3u8.MediaPlaylist)
-		//log.Printf("DEBUG: Playlist %v", mediapl.SeqNo)
 		if mediapl.SeqNo > seqnumber {
 			for _, segment := range mediapl.Segments {
 				if segment != nil {
@@ -276,31 +244,12 @@ func getPlaylist(u *url.URL) {
 							if err != nil {
 								log.Printf("ERROR: %v", err)
 							}
-							//log.Printf("Tracks[0] is %v", tracks[0])
-							// 2019/09/23 19:07:56 u.Path = /pool_904/live/uk/bbc_6music/bbc_6music.isml/bbc_6music-audio=320000-245197198.ts
-							//start := time.Now()
 							file := path.Base(u.Path)
-							//file := strings.TrimPrefix(u.Path, "/pool_904/live/uk/bbc_6music/bbc_6music.isml/")
-							/*
-									err = os.Remove(datadir + file)
-								if err != nil {
-									log.Printf("Error removing stale file %v (%v)", file, err)
-								} else {
-									tracks = append(tracks[:0], tracks[0+1:]...)
-								}
-							*/
 							tracks = append(tracks[:0], tracks[0+1:]...) // keep track of tracks...
-							// map
 							delete(buffers, file)
-							for k, _ := range buffers {
-								log.Printf("DEBUG: BUFFER %v exists", k)
-							}
-							//elapsed := time.Since(start)
-							//log.Printf("TRACK: %v deleted from disk", file)
 						}
 
 						if track == msURL.String() {
-							//log.Printf("Already Seen %v", msURL.String())
 							seen = true
 							break
 						}
@@ -310,11 +259,9 @@ func getPlaylist(u *url.URL) {
 						tracks = append(tracks, msURL.String())
 						download(msURL)
 						u, err := url.Parse(msURL.String())
-						//log.Printf("DEBUG %v", u.String())
 						if err != nil {
 							log.Printf("Error: %v", err)
 						}
-						//log.Printf("TRACK: %v added to cache/download", msURL.String())
 						elapsed := time.Since(start)
 						uptime := time.Since(starttime)
 						log.Printf("TRACK: %v downloaded in %v, data total: %v, uptime: %v", path.Base(u.Path), elapsed.Truncate(time.Millisecond), ByteCountSI(tbytes), uptime.Truncate(time.Second))
@@ -322,23 +269,10 @@ func getPlaylist(u *url.URL) {
 							log.Printf("ERROR: %v", err)
 						}
 					}
-					//tracks = append(tracks, msURL.String())
-					//download(msURL)
-					//log.Printf("TRACK: %v added to cache/download", msURL.String())
-					//log.Printf("Tracks: %v", tracks)
-					//cache.Add(msURL.String(), nil)
-					//download(msURL)
-					//}
-
 				}
 			}
-			//log.Printf("DEBUG writing playlist for seqnumber %v (was %v", mediapl.SeqNo, seqnumber)
 			seqnumber = mediapl.SeqNo
-			// handle 'u' ?
-			//log.Printf("DEBUG : %v", u.String())
-			//writePlaylist(u, m3u8.Playlist(mediapl))
 			currentplist = m3u8.Playlist(mediapl).Encode().Bytes()
-			//log.Printf("PLAYLIST: SeqNo %v written to disk", seqnumber)
 		}
 	}
 }
@@ -352,65 +286,21 @@ func indexHandler(w http.ResponseWriter, req *http.Request) {
 func fileHandler(w http.ResponseWriter, req *http.Request) {
 	start := time.Now()
 	w.Header().Set("X-Powered-By", "Golang!")
-	//log.Printf("DEBUG: req.URL.Path=%v", req.URL.Path)
-	// currentplist
-	//fmt.Fprintf(w, "meep!")
-	//w.Write(currentplist)
 	path := filepath.Base(req.URL.Path)
 	if data, ok := buffers[path]; ok {
-		log.Printf("buffer found")
 		_, err := w.Write(data)
 		if err != nil {
 			log.Printf("ERROR: %v", err)
 		}
 	} else {
-		log.Printf("buffer not found, looking for %v", path)
 		fmt.Fprintf(w, string(currentplist))
 	}
-	/*
-		_, err = os.Stat(datadir + path)
-		if os.IsNotExist(err) {
-			fmt.Fprintf(w, string(currentplist))
-			return
-		} else if err != nil {
-			// if we got an error (that wasn't that the file doesn't exist) stating the
-			// file, return a 500 internal server error and stop
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		content, err := ioutil.ReadFile(datadir + path)
-		if err != nil {
-			log.Printf("ERROR: %v")
-		}
-		_, err = w.Write(content)
-		if err != nil {
-			log.Printf("ERROR: %v")
-		}
-	*/
 	log.Printf("REMOTE: Client from %v served %v in %v", req.RemoteAddr, path, time.Since(start))
 }
 
 func main() {
 	starttime = time.Now()
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
-	/*
-		err := os.MkdirAll(datadir, 0755)
-		if err != nil {
-			log.Printf("ERROR: Creating %v data directory (%v)", datadir, err)
-		}
-		// cleanup all stale files matching bbc_6music-audio=320000*
-		files, err := filepath.Glob(datadir + "bbc_6music-audio=320000*")
-		if err != nil {
-			panic(err)
-		}
-		for _, f := range files {
-			if err := os.Remove(f); err != nil {
-				panic(err)
-			}
-			log.Printf("INFO: Deleting stale media file %v", f)
-		}
-	*/
-	//log.Printf(Station(1))
 	if !strings.HasPrefix(sourceurl, "http") {
 		log.Fatal("cms17> " + "Playlist URL must begin with http/https")
 	}
@@ -425,30 +315,17 @@ func main() {
 			getPlaylist(target)
 		}
 	}()
-	/*
-		for {
-			getPlaylist(target)
-			time.Sleep(1337 * time.Millisecond)
-		}
-	*/
-
-	//log.Fatal(http.ListenAndServe(":"+port, http.FileServer(http.Dir(datadir))))
-	//http.HandleFunc("/", indexHandler)
-	//http.Handle("/hls", http.FileServer(http.Dir(datadir)))
-	//log.Fatal(http.ListenAndServe(":"+port, nil))
 
 	r := mux.NewRouter()
 	r.HandleFunc("/", indexHandler)
 	r.HandleFunc("/{filename}", fileHandler)
 
 	srv := &http.Server{
-		Handler: r,
-		Addr:    ":" + port,
-		// Good practice: enforce timeouts for servers you create!
+		Handler:      r,
+		Addr:         ":" + port,
 		WriteTimeout: 15 * time.Second,
 		ReadTimeout:  15 * time.Second,
 	}
-
+	srv.SetKeepAlivesEnabled(true)
 	log.Fatal(srv.ListenAndServe())
-
 }
