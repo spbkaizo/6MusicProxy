@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	//"os"
+	_ "net/http/pprof"
 	"path"
 	"path/filepath"
 	"strings"
@@ -151,13 +152,6 @@ func absolutize(rawurl string, u *url.URL) (uri *url.URL, err error) {
 func download(u *url.URL) {
 	fileName := path.Base(u.Path)
 
-	/*out, err := os.Create(datadir + fileName)
-	if err != nil {
-		log.Fatal("cms5> " + err.Error())
-	}
-	defer out.Close()
-	*/
-
 	content, err := getContent(u)
 	if err != nil {
 		log.Print("cms6> " + err.Error())
@@ -168,30 +162,13 @@ func download(u *url.URL) {
 	buf.ReadFrom(content)
 	buffers[fileName] = buf.Bytes()
 
-	// FIX BYTE COUNT
-	/*
-		size, err := io.Copy(out, content)
-		tbytes = tbytes + uint64(size)
-		if err != nil {
-			log.Print("cms7> " + err.Error() + "Failed to download " + fileName + "\n")
-		}
-	*/
-
 }
 
 func getPlaylist(u *url.URL) {
-	//start := time.Now()
-
-	//cache := lru.New(64)
-
 	content, err := getContent(u)
 	if err != nil {
 		log.Fatal("cms9> " + err.Error())
 	}
-
-	//elapsed := time.Since(start)
-	//log.Printf("PLAYLIST: %v completed in %v", path.Base(u.Path), elapsed)
-
 	playlist, listType, err := m3u8.DecodeFrom(content, true)
 	if err != nil {
 		log.Fatal("cms10> " + err.Error())
@@ -207,20 +184,15 @@ func getPlaylist(u *url.URL) {
 
 		masterpl := playlist.(*m3u8.MasterPlaylist)
 		for _, variant := range masterpl.Variants {
-
 			if variant != nil {
-
 				msURL, err := absolutize(variant.URI, u)
 				if err != nil {
 					log.Fatal("cms12> " + err.Error())
 				}
 				getPlaylist(msURL)
-				//log.Print("cms13> "+"Downloaded chunklist number ", k+1, "\n\n")
-				//break
 			}
 
 		}
-		//writePlaylist(u, m3u8.Playlist(masterpl))
 		return
 	}
 
@@ -229,14 +201,10 @@ func getPlaylist(u *url.URL) {
 		if mediapl.SeqNo > seqnumber {
 			for _, segment := range mediapl.Segments {
 				if segment != nil {
-
 					msURL, err := absolutize(segment.URI, u)
 					if err != nil {
 						log.Fatal("cms15> " + err.Error())
 					}
-
-					//_, hit := cache.Get(msURL.String())
-					//if !hit {
 					seen := false
 					for _, track := range tracks {
 						if len(tracks) > 12 {
@@ -248,7 +216,6 @@ func getPlaylist(u *url.URL) {
 							tracks = append(tracks[:0], tracks[0+1:]...) // keep track of tracks...
 							delete(buffers, file)
 						}
-
 						if track == msURL.String() {
 							seen = true
 							break
@@ -272,6 +239,7 @@ func getPlaylist(u *url.URL) {
 				}
 			}
 			seqnumber = mediapl.SeqNo
+			// store playlist in memory for clients
 			currentplist = m3u8.Playlist(mediapl).Encode().Bytes()
 		}
 	}
@@ -279,21 +247,28 @@ func getPlaylist(u *url.URL) {
 
 func indexHandler(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("X-Powered-By", "Golang!")
-	// currentplist
-	fmt.Fprintf(w, string(currentplist))
+	//fmt.Fprintf(w, string(currentplist))
+	fmt.Fprintf(w, "nothing to see here...")
 }
 
 func fileHandler(w http.ResponseWriter, req *http.Request) {
 	start := time.Now()
 	w.Header().Set("X-Powered-By", "Golang!")
 	path := filepath.Base(req.URL.Path)
-	if data, ok := buffers[path]; ok {
+	log.Printf("REQ for %v", path)
+	if strings.Contains(path, "m3u8") {
+		// application/x-mpegURL
+		w.Header().Set("Content-Type", "application/x-mpegURL")
+		fmt.Fprintf(w, string(currentplist))
+	} else if data, ok := buffers[path]; ok {
+		// video/MP2T
+		w.Header().Set("Content-Type", "video/MP2T")
 		_, err := w.Write(data)
 		if err != nil {
 			log.Printf("ERROR: %v", err)
 		}
 	} else {
-		fmt.Fprintf(w, string(currentplist))
+		fmt.Fprintf(w, "meep!")
 	}
 	log.Printf("REMOTE: Client from %v served %v in %v", req.RemoteAddr, path, time.Since(start))
 }
@@ -309,11 +284,16 @@ func main() {
 	if err != nil {
 		log.Fatal("cms18> " + err.Error())
 	}
-	timer := time.NewTicker(1337 * time.Millisecond)
+	timer := time.NewTicker(500 * time.Millisecond)
 	go func() {
 		for _ = range timer.C {
 			getPlaylist(target)
 		}
+	}()
+
+	// debugging
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
 	}()
 
 	r := mux.NewRouter()
