@@ -27,6 +27,7 @@ var tracks []string
 var useragent = "VLC/3.0.8 LibVLC/3.0.8"
 var tbytes int64
 var seqnumber uint64
+var ourseqnumber uint64
 var starttime time.Time
 
 //var datadir = "hls/"
@@ -198,7 +199,13 @@ func getPlaylist(u *url.URL) {
 
 	if listType == m3u8.MEDIA {
 		mediapl := playlist.(*m3u8.MediaPlaylist)
+		newplist, err := m3u8.NewMediaPlaylist(mediapl.Count(), mediapl.Count())
+		if err != nil {
+			log.Printf("ERROR: %v", err)
+		}
 		if mediapl.SeqNo > seqnumber {
+			ourseqnumber++
+			newplist.SeqNo = ourseqnumber
 			for _, segment := range mediapl.Segments {
 				if segment != nil {
 					msURL, err := absolutize(segment.URI, u)
@@ -206,24 +213,34 @@ func getPlaylist(u *url.URL) {
 						log.Fatal("cms15> " + err.Error())
 					}
 					seen := false
-					for _, track := range tracks {
+					//log.Printf("DEBUG: TRACKS: %v", tracks)
+					for i, track := range tracks {
+						/*
+							u, err := url.Parse(msURL.String())
+							if err != nil {
+								log.Printf("ERROR: %v", err)
+							}
+						*/
+						//log.Printf("DEBUG: Track in loop %v at pos %v", track, i)
 						if len(tracks) > 12 {
+							//log.Printf("DEBUG len(tracks) is %v", len(tracks))
 							u, err := url.Parse(tracks[0])
 							if err != nil {
 								log.Printf("ERROR: %v", err)
 							}
 							file := path.Base(u.Path)
-							tracks = append(tracks[:0], tracks[0+1:]...) // keep track of tracks...
+							tracks = append(tracks[:i], tracks[i+1:]...) // keep track of tracks...
 							delete(buffers, file)
 						}
-						if track == msURL.String() {
+						//if track == msURL.String() {
+						//log.Printf("DEBUG: track %v, msurls %v", track, path.Base(msURL.String()))
+						if track == path.Base(msURL.String()) {
 							seen = true
-							break
 						}
 					}
 					if seen == false {
 						start := time.Now()
-						tracks = append(tracks, msURL.String())
+						//tracks = append(tracks, msURL.String())
 						download(msURL)
 						u, err := url.Parse(msURL.String())
 						if err != nil {
@@ -235,12 +252,18 @@ func getPlaylist(u *url.URL) {
 						if err != nil {
 							log.Printf("ERROR: %v", err)
 						}
+						tracks = append(tracks, path.Base(u.Path))
+						//newplist.Append(path.Base(u.Path), segment.Duration, "foo")
+						//log.Printf("%v", newplist)
 					}
+					// copy the items to our new playlist, copy details from original too.
+					newplist.Append(path.Base(msURL.String()), segment.Duration, "foo")
 				}
 			}
 			seqnumber = mediapl.SeqNo
 			// store playlist in memory for clients
-			currentplist = m3u8.Playlist(mediapl).Encode().Bytes()
+			//currentplist = m3u8.Playlist(mediapl).Encode().Bytes()
+			currentplist = m3u8.Playlist(newplist).Encode().Bytes()
 		}
 	}
 }
