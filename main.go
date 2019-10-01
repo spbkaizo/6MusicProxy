@@ -255,7 +255,7 @@ func getPlaylist(u *url.URL) {
 						Title:    "Kaizo HLS Relay",
 						URI:      path.Base(msURL.String()),
 						Duration: segment.Duration}
-					log.Printf("DEBUG: %v", newsegment)
+					//log.Printf("DEBUG: %v", newsegment)
 					err = newplist.AppendSegment(&newsegment)
 					if err != nil {
 						log.Printf("ERROR: %v", err)
@@ -280,7 +280,7 @@ func fileHandler(w http.ResponseWriter, req *http.Request) {
 	start := time.Now()
 	w.Header().Set("X-Powered-By", "Golang!")
 	path := filepath.Base(req.URL.Path)
-	log.Printf("REQ for %v", path)
+	//log.Printf("REQ for %v", path)
 	if strings.Contains(path, "m3u8") {
 		// application/x-mpegURL
 		w.Header().Set("Content-Type", "application/x-mpegURL")
@@ -295,7 +295,8 @@ func fileHandler(w http.ResponseWriter, req *http.Request) {
 	} else {
 		fmt.Fprintf(w, "meep!")
 	}
-	log.Printf("REMOTE: Client from %v served %v in %v", req.RemoteAddr, path, time.Since(start))
+	//log.Printf("DEBUG: Req - %v", req)
+	log.Printf("REMOTE: Client from %v served %v in %v [%v]", req.RemoteAddr, path, time.Since(start), req.Header.Get("User-Agent"))
 }
 
 func main() {
