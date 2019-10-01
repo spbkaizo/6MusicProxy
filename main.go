@@ -28,7 +28,8 @@ var useragent = "VLC/3.0.8 LibVLC/3.0.8"
 var tbytes int64
 var seqnumber uint64
 var ourseqnumber uint64
-var oursegmentnum uint64
+
+//var oursegmentnum uint64
 var starttime time.Time
 
 //var datadir = "hls/"
@@ -151,21 +152,6 @@ func absolutize(rawurl string, u *url.URL) (uri *url.URL, err error) {
 	return
 }
 
-func download(u *url.URL) {
-	fileName := path.Base(u.Path)
-
-	content, err := getContent(u)
-	if err != nil {
-		log.Print("cms6> " + err.Error())
-		//continue
-	}
-	defer content.Close()
-	buf := new(bytes.Buffer)
-	buf.ReadFrom(content)
-	buffers[fileName] = buf.Bytes()
-
-}
-
 func getPlaylist(u *url.URL) {
 	content, err := getContent(u)
 	if err != nil {
@@ -240,10 +226,15 @@ func getPlaylist(u *url.URL) {
 						}
 					}
 					if seen == false {
-						oursegmentnum++ // increment
+						//oursegmentnum++ // increment
 						start := time.Now()
 						//tracks = append(tracks, msURL.String())
-						download(msURL)
+						//download(msURL)
+						newbuf := new(bytes.Buffer)
+						content, err := getContent(msURL)
+						newbuf.ReadFrom(content)
+						content.Close() // done with it
+						buffers[path.Base(msURL.Path)] = newbuf.Bytes()
 						u, err := url.Parse(msURL.String())
 						if err != nil {
 							log.Printf("Error: %v", err)
@@ -261,7 +252,6 @@ func getPlaylist(u *url.URL) {
 					// copy the items to our new playlist, copy details from original too.
 					//newplist.Append(path.Base(msURL.String()), segment.Duration, "foo")
 					newsegment := m3u8.MediaSegment{
-						SeqId:    oursegmentnum,
 						Title:    "Kaizo HLS Relay",
 						URI:      path.Base(msURL.String()),
 						Duration: segment.Duration}
