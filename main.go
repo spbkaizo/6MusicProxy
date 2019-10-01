@@ -28,6 +28,7 @@ var useragent = "VLC/3.0.8 LibVLC/3.0.8"
 var tbytes int64
 var seqnumber uint64
 var ourseqnumber uint64
+var oursegmentnum uint64
 var starttime time.Time
 
 //var datadir = "hls/"
@@ -239,6 +240,7 @@ func getPlaylist(u *url.URL) {
 						}
 					}
 					if seen == false {
+						oursegmentnum++ // increment
 						start := time.Now()
 						//tracks = append(tracks, msURL.String())
 						download(msURL)
@@ -257,7 +259,17 @@ func getPlaylist(u *url.URL) {
 						//log.Printf("%v", newplist)
 					}
 					// copy the items to our new playlist, copy details from original too.
-					newplist.Append(path.Base(msURL.String()), segment.Duration, "foo")
+					//newplist.Append(path.Base(msURL.String()), segment.Duration, "foo")
+					newsegment := m3u8.MediaSegment{
+						SeqId:    oursegmentnum,
+						Title:    "Kaizo HLS Relay",
+						URI:      path.Base(msURL.String()),
+						Duration: segment.Duration}
+					log.Printf("DEBUG: %v", newsegment)
+					err = newplist.AppendSegment(&newsegment)
+					if err != nil {
+						log.Printf("ERROR: %v", err)
+					}
 				}
 			}
 			seqnumber = mediapl.SeqNo
