@@ -7,15 +7,16 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/grafov/m3u8"
 	"io"
-	//"io/ioutil"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
-	"net/url"
-	//"os"
 	_ "net/http/pprof"
+	"net/url"
+	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -27,13 +28,15 @@ var tracks []string
 var useragent = "VLC/3.0.8 LibVLC/3.0.8"
 var tbytes int64
 var seqnumber uint64
-var ourseqnumber uint64
+var ourseqnumber int
 
 //var oursegmentnum uint64
 var starttime time.Time
 
 //var datadir = "hls/"
 var port string = "8888"
+var statefile = "sequence.dat"
+
 var currentplist []byte
 var buffers = make(map[string][]byte)
 
@@ -192,7 +195,7 @@ func getPlaylist(u *url.URL) {
 		}
 		if mediapl.SeqNo > seqnumber {
 			ourseqnumber++
-			newplist.SeqNo = ourseqnumber
+			newplist.SeqNo = uint64(ourseqnumber)
 			for _, segment := range mediapl.Segments {
 				if segment != nil {
 					msURL, err := absolutize(segment.URI, u)
@@ -241,7 +244,7 @@ func getPlaylist(u *url.URL) {
 						}
 						elapsed := time.Since(start)
 						uptime := time.Since(starttime)
-						log.Printf("TRACK: %v downloaded in %v, data total: %v, uptime: %v", path.Base(u.Path), elapsed.Truncate(time.Millisecond), ByteCountSI(tbytes), uptime.Truncate(time.Second))
+						log.Printf("TRACK:  %v downloaded in %v, data total: %v, uptime: %v", path.Base(u.Path), elapsed.Truncate(time.Millisecond), ByteCountSI(tbytes), uptime.Truncate(time.Second))
 						if err != nil {
 							log.Printf("ERROR: %v", err)
 						}
@@ -266,6 +269,11 @@ func getPlaylist(u *url.URL) {
 			// store playlist in memory for clients
 			//currentplist = m3u8.Playlist(mediapl).Encode().Bytes()
 			currentplist = m3u8.Playlist(newplist).Encode().Bytes()
+			state := []byte(strconv.Itoa(ourseqnumber))
+			err := ioutil.WriteFile(statefile, state, 0644)
+			if err != nil {
+				log.Printf("ERROR: Writing statefile %v (%v)", statefile, err)
+			}
 		}
 	}
 }
@@ -309,6 +317,19 @@ func main() {
 	target, err := url.Parse(sourceurl)
 	if err != nil {
 		log.Fatal("cms18> " + err.Error())
+	}
+
+	if _, err := os.Stat(statefile); os.IsNotExist(err) {
+		log.Printf("WARNING: Could not load current state from file %v (%v)", statefile, err)
+	} else {
+		oldstate, err := ioutil.ReadFile(statefile)
+		if err != nil {
+			log.Printf("ERROR: State file %v exists, but cannot open (%v)", statefile, err)
+		}
+		ourseqnumber, err = strconv.Atoi(string(oldstate))
+		if err != nil {
+			log.Printf("ERROR: %v", err)
+		}
 	}
 	timer := time.NewTicker(500 * time.Millisecond)
 	go func() {
