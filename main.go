@@ -35,7 +35,7 @@ var starttime time.Time
 
 //var datadir = "hls/"
 var port string = "8888"
-var statefile = "sequence.dat"
+var statefile = "/var/db/sequence.dat"
 
 var currentplist []byte
 var buffers = make(map[string][]byte)
@@ -103,12 +103,12 @@ func ByteCountSI(b int64) string {
 func getContent(u *url.URL) (io.ReadCloser, error) {
 	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
-		log.Printf("ERROR: %v", err)
+		log.Printf("ERROR:  %v", err)
 	}
 	req.Header.Set("User-Agent", useragent)
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Printf("ERROR: %v", err)
+		log.Printf("ERROR:  %v", err)
 	}
 	if resp.StatusCode != 200 {
 		log.Printf("Received HTTP %v for %v\n", resp.StatusCode, u.String())
@@ -191,7 +191,7 @@ func getPlaylist(u *url.URL) {
 		mediapl := playlist.(*m3u8.MediaPlaylist)
 		newplist, err := m3u8.NewMediaPlaylist(mediapl.Count(), mediapl.Count())
 		if err != nil {
-			log.Printf("ERROR: %v", err)
+			log.Printf("ERROR:  %v", err)
 		}
 		if mediapl.SeqNo > seqnumber {
 			ourseqnumber++
@@ -216,7 +216,7 @@ func getPlaylist(u *url.URL) {
 							//log.Printf("DEBUG len(tracks) is %v", len(tracks))
 							u, err := url.Parse(tracks[0])
 							if err != nil {
-								log.Printf("ERROR: %v", err)
+								log.Printf("ERROR:  %v", err)
 							}
 							file := path.Base(u.Path)
 							tracks = append(tracks[:i], tracks[i+1:]...) // keep track of tracks...
@@ -246,7 +246,7 @@ func getPlaylist(u *url.URL) {
 						uptime := time.Since(starttime)
 						log.Printf("TRACK:  %v downloaded in %v, data total: %v, uptime: %v", path.Base(u.Path), elapsed.Truncate(time.Millisecond), ByteCountSI(tbytes), uptime.Truncate(time.Second))
 						if err != nil {
-							log.Printf("ERROR: %v", err)
+							log.Printf("ERROR:  %v", err)
 						}
 						tracks = append(tracks, path.Base(u.Path))
 						//newplist.Append(path.Base(u.Path), segment.Duration, "foo")
@@ -261,7 +261,7 @@ func getPlaylist(u *url.URL) {
 					//log.Printf("DEBUG: %v", newsegment)
 					err = newplist.AppendSegment(&newsegment)
 					if err != nil {
-						log.Printf("ERROR: %v", err)
+						log.Printf("ERROR:  %v", err)
 					}
 				}
 			}
@@ -272,7 +272,7 @@ func getPlaylist(u *url.URL) {
 			state := []byte(strconv.Itoa(ourseqnumber))
 			err := ioutil.WriteFile(statefile, state, 0644)
 			if err != nil {
-				log.Printf("ERROR: Writing statefile %v (%v)", statefile, err)
+				log.Printf("ERROR:  Writing statefile %v (%v)", statefile, err)
 			}
 		}
 	}
@@ -298,7 +298,7 @@ func fileHandler(w http.ResponseWriter, req *http.Request) {
 		w.Header().Set("Content-Type", "video/MP2T")
 		_, err := w.Write(data)
 		if err != nil {
-			log.Printf("ERROR: %v", err)
+			log.Printf("ERROR:  %v", err)
 		}
 	} else {
 		fmt.Fprintf(w, "meep!")
@@ -324,11 +324,11 @@ func main() {
 	} else {
 		oldstate, err := ioutil.ReadFile(statefile)
 		if err != nil {
-			log.Printf("ERROR: State file %v exists, but cannot open (%v)", statefile, err)
+			log.Printf("ERROR:  State file %v exists, but cannot open (%v)", statefile, err)
 		}
 		ourseqnumber, err = strconv.Atoi(string(oldstate))
 		if err != nil {
-			log.Printf("ERROR: %v", err)
+			log.Printf("ERROR:  %v", err)
 		}
 	}
 	timer := time.NewTicker(500 * time.Millisecond)
