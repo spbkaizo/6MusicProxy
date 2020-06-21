@@ -3,9 +3,11 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/grafov/m3u8"
+	"github.com/sevlyar/go-daemon"
 	"io"
 	"io/ioutil"
 	"log"
@@ -109,10 +111,12 @@ func getContent(u *url.URL) (io.ReadCloser, error) {
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Printf("ERROR:  %v", err)
+		return nil, err
 	}
 	if resp.StatusCode != 200 {
 		log.Printf("Received HTTP %v for %v\n", resp.StatusCode, u.String())
-		return nil, err
+		return nil, errors.New("Request was fine, but status code isn't 200")
+		//return nil, err
 	}
 	//log.Printf("DEBUG: Server Headers: %v", resp.Header)
 	tbytes = tbytes + resp.ContentLength
@@ -158,16 +162,20 @@ func absolutize(rawurl string, u *url.URL) (uri *url.URL, err error) {
 func getPlaylist(u *url.URL) {
 	content, err := getContent(u)
 	if err != nil {
-		log.Fatal("cms9> " + err.Error())
+		log.Printf("ERROR: Downloading Playlist (%vi)", err)
+		return
 	}
 	playlist, listType, err := m3u8.DecodeFrom(content, true)
 	if err != nil {
-		log.Fatal("cms10> " + err.Error())
+		//log.Fatal("cms10> " + err.Error())
+		log.Printf("ERROR: Decoding Playlist (%v)", err)
+		return
 	}
 	content.Close()
 
 	if listType != m3u8.MEDIA && listType != m3u8.MASTER {
-		log.Fatal("cms11> " + "Not a valid playlist")
+		//log.Fatal("cms11> " + "Not a valid playlist")
+		log.Printf("ERROR: Not a valid playlist")
 		return
 	}
 
@@ -235,6 +243,10 @@ func getPlaylist(u *url.URL) {
 						//download(msURL)
 						newbuf := new(bytes.Buffer)
 						content, err := getContent(msURL)
+						if err != nil {
+							log.Printf("ERROR: Getting content from %v", msURL)
+							return
+						}
 						newbuf.ReadFrom(content)
 						content.Close() // done with it
 						buffers[path.Base(msURL.Path)] = newbuf.Bytes()
@@ -308,6 +320,23 @@ func fileHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func main() {
+	cntxt := &daemon.Context{
+		PidFileName: "/var/run/6music.pid",
+		PidFilePerm: 0644,
+		LogFileName: "/var/log/6music.log",
+		LogFilePerm: 0644,
+		WorkDir:     "/var/empty/",
+		Umask:       022,
+	}
+
+	d, err := cntxt.Reborn()
+	if err != nil {
+		log.Fatal("Unable to run: ", err)
+	}
+	if d != nil {
+		return
+	}
+	defer cntxt.Release()
 	starttime = time.Now()
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	if !strings.HasPrefix(sourceurl, "http") {
