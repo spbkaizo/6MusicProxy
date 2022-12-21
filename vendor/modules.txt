@@ -1,4 +1,0 @@
-# github.com/gorilla/mux v1.7.3
-github.com/gorilla/mux
-# github.com/grafov/m3u8 v0.11.1
-github.com/grafov/m3u8

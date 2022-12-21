@@ -5,9 +5,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/gorilla/mux"
-	"github.com/grafov/m3u8"
-	"github.com/sevlyar/go-daemon"
 	"io"
 	"io/ioutil"
 	"log"
@@ -22,6 +19,10 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/gorilla/mux"
+	"github.com/grafov/m3u8"
+	"github.com/sevlyar/go-daemon"
 )
 
 var sourceurl = "http://as-hls-uk-live.akamaized.net/pool_904/live/uk/bbc_6music/bbc_6music.isml/bbc_6music-audio%3d320000.norewind.m3u8"
@@ -41,26 +42,6 @@ var statefile = "/var/db/sequence.dat"
 
 var currentplist []byte
 var buffers = make(map[string][]byte)
-
-/*
-type Station int
-
-const (
-	BBC_Radio_1 Station = 1
-	BBC_Radio_2 Station = 2
-	BBC_6_Music Station = 6
-)
-
-func (station Station) URL() string {
-	stations := make(map[int]string)
-	stations[BBC_Radio_1] = "http://a.files.bbci.co.uk/media/live/manifesto/audio/simulcast/hls/uk/sbr_high/ak/bbc_radio_one.m3u8"
-	stations[BBC_Radio_2] = "http://a.files.bbci.co.uk/media/live/manifesto/audio/simulcast/hls/uk/sbr_high/ak/bbc_radio_two.m3u8"
-	// return the name of a Weekday
-	// constant from the names array
-	// above.
-	return names[station]
-}
-*/
 
 var (
 	once      sync.Once
@@ -87,7 +68,7 @@ func newNetClient() *http.Client {
 	return netClient
 }
 
-// Make log messages print out prettier bytes info...
+// ByteCountSI Make log messages print out prettier bytes info...
 func ByteCountSI(b int64) string {
 	const unit = 1000
 	if b < unit {
