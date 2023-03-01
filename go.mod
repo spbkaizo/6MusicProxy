@@ -1,4 +1,4 @@
-module kaizo.org/simonb/6music
+module github.com/spbkaizo/6MusicProxy
 
 go 1.13
 
