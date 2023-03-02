@@ -1,6 +1,6 @@
 # Overview 
 This is a small utility which basically creates a web server, which you can connect
-to on http://hostname:8888/index.m3u8 which keeps a local copy of the current HLS
+to on http://hostname:8888/6MusicProxy/index.m3u8 which keeps a local copy of the current HLS
 stream from 6 Music.
 
 This basically reduces the load on the BBC servers, if you have multirooms connecting
@@ -12,6 +12,12 @@ service).
 I've had this running about a year, its pretty stable and handles router reboots well,
 if the rooter reboots in a short time then you should not hear any breaks in the streams
 which used to drive me mad!
+
+# Installation
+
+1. Create a user
+2. Give that user ownership of the files /var/log/6music.log, /var/db/sequence.dat, /var/run/6music.pid
+3. Run the command as that user, e.g. doas -u 6musicproxy 6MusicProxy
 
 # Log file format 
 
