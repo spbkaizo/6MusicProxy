@@ -259,8 +259,9 @@ func getPlaylist(u *url.URL) error {
 					// copy the items to our new playlist, copy details from original too.
 					//newplist.Append(path.Base(msURL.String()), segment.Duration, "foo")
 					newsegment := m3u8.MediaSegment{
-						Title:    "Kaizo HLS Relay",
-						URI:      path.Base(msURL.String()),
+						Title: "Kaizo HLS Relay",
+						//URI:      path.Base("6MusicProxy/" + msURL.String()),
+						URI:      "6MusicProxy/" + path.Base(msURL.String()),
 						Duration: segment.Duration}
 					//log.Printf("DEBUG: %v", newsegment)
 					err = newplist.AppendSegment(&newsegment)
@@ -358,7 +359,7 @@ func main() {
 			log.Printf("ERROR:  %v", err)
 		}
 	}
-	timer := time.NewTicker(500 * time.Millisecond)
+	timer := time.NewTicker(5000 * time.Millisecond)
 	go func() {
 		for _ = range timer.C {
 			getPlaylist(target)
@@ -371,8 +372,8 @@ func main() {
 	}()
 
 	r := mux.NewRouter()
-	r.HandleFunc("/", indexHandler)
-	r.HandleFunc("/{filename}", fileHandler)
+	r.HandleFunc("/6MusicProxy/", indexHandler)
+	r.HandleFunc("/6MusicProxy/{filename}", fileHandler)
 
 	srv := &http.Server{
 		Handler:      r,
