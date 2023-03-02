@@ -103,12 +103,14 @@ func getContent(u *url.URL) (io.ReadCloser, error) {
 	//log.Printf("DEBUG: Server Headers: %v", resp.Header)
 
 	tbytes = tbytes + resp.ContentLength
-	log.Printf("DEBUG: Body: %#v", resp.Body)
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		log.Printf("DEBUG: Body Read Error: %v", err)
-	}
-	log.Printf("DEBUG: Body: %v", string(body))
+	/*
+		log.Printf("DEBUG: Body: %#v", resp.Body)
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			log.Printf("DEBUG: Body Read Error: %v", err)
+		}
+		log.Printf("DEBUG: Body: %v", string(body))
+	*/
 	return resp.Body, err
 }
 
@@ -155,7 +157,7 @@ func getPlaylist(u *url.URL) error {
 		return err
 	}
 	playlist, listType, err := m3u8.DecodeFrom(content, false)
-	log.Printf("DEBUG: %#v, %#v", playlist, listType)
+	//log.Printf("DEBUG: %#v, %#v", playlist, listType)
 	if err != nil {
 		//log.Fatal("cms10> " + err.Error())
 		log.Printf("ERROR: Decoding Playlist (%v)", err)
