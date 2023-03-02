@@ -21,8 +21,8 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/grafov/m3u8"
 	"github.com/sevlyar/go-daemon"
+	"github.com/spbkaizo/m3u8"
 )
 
 var sourceurl = "http://as-hls-uk-live.akamaized.net/pool_904/live/uk/bbc_6music/bbc_6music.isml/bbc_6music-audio%3d320000.norewind.m3u8"
@@ -87,6 +87,7 @@ func getContent(u *url.URL) (io.ReadCloser, error) {
 	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
 		log.Printf("ERROR:  %v", err)
+		return nil, err
 	}
 	req.Header.Set("User-Agent", useragent)
 	resp, err := client.Do(req)
@@ -100,7 +101,14 @@ func getContent(u *url.URL) (io.ReadCloser, error) {
 		//return nil, err
 	}
 	//log.Printf("DEBUG: Server Headers: %v", resp.Header)
+
 	tbytes = tbytes + resp.ContentLength
+	log.Printf("DEBUG: Body: %#v", resp.Body)
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Printf("DEBUG: Body Read Error: %v", err)
+	}
+	log.Printf("DEBUG: Body: %v", string(body))
 	return resp.Body, err
 }
 
@@ -140,24 +148,25 @@ func absolutize(rawurl string, u *url.URL) (uri *url.URL, err error) {
 	return
 }
 
-func getPlaylist(u *url.URL) {
+func getPlaylist(u *url.URL) error {
 	content, err := getContent(u)
 	if err != nil {
 		log.Printf("ERROR: Downloading Playlist (%vi)", err)
-		return
+		return err
 	}
-	playlist, listType, err := m3u8.DecodeFrom(content, true)
+	playlist, listType, err := m3u8.DecodeFrom(content, false)
+	log.Printf("DEBUG: %#v, %#v", playlist, listType)
 	if err != nil {
 		//log.Fatal("cms10> " + err.Error())
 		log.Printf("ERROR: Decoding Playlist (%v)", err)
-		return
+		return err
 	}
 	content.Close()
 
 	if listType != m3u8.MEDIA && listType != m3u8.MASTER {
 		//log.Fatal("cms11> " + "Not a valid playlist")
 		log.Printf("ERROR: Not a valid playlist")
-		return
+		return err
 	}
 
 	if listType == m3u8.MASTER {
@@ -173,7 +182,7 @@ func getPlaylist(u *url.URL) {
 			}
 
 		}
-		return
+		return nil
 	}
 
 	if listType == m3u8.MEDIA {
@@ -226,7 +235,7 @@ func getPlaylist(u *url.URL) {
 						content, err := getContent(msURL)
 						if err != nil {
 							log.Printf("ERROR: Getting content from %v", msURL)
-							return
+							return nil
 						}
 						newbuf.ReadFrom(content)
 						content.Close() // done with it
@@ -269,6 +278,7 @@ func getPlaylist(u *url.URL) {
 			}
 		}
 	}
+	return nil
 }
 
 func indexHandler(w http.ResponseWriter, req *http.Request) {
@@ -330,7 +340,12 @@ func main() {
 	}
 
 	if _, err := os.Stat(statefile); os.IsNotExist(err) {
-		log.Printf("WARNING: Could not load current state from file %v (%v)", statefile, err)
+		err := os.WriteFile(statefile, []byte("1"), 0644)
+		if err != nil {
+			log.Printf("FATAL: Could not create statefile %v (%v)", statefile, err)
+			log.Printf("INFO: Please ensure file exists and has the correct owner, or the user running this has permissions to write to the file/directory.")
+		}
+		ourseqnumber = 1
 	} else {
 		oldstate, err := ioutil.ReadFile(statefile)
 		if err != nil {
