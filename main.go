@@ -4,6 +4,7 @@ package main
 import (
 	"bytes"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -313,23 +314,30 @@ func fileHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func main() {
-	cntxt := &daemon.Context{
-		PidFileName: "/var/run/6music.pid",
-		PidFilePerm: 0644,
-		LogFileName: "/var/log/6music.log",
-		LogFilePerm: 0644,
-		WorkDir:     "/var/empty/",
-		Umask:       022,
+	daemonFlag := flag.Bool("d", false, "Run as a daemon")
+	flag.Parse()
+
+	var cntxt *daemon.Context
+	if *daemonFlag {
+		cntxt = &daemon.Context{
+			PidFileName: "/var/run/6music.pid",
+			PidFilePerm: 0644,
+			LogFileName: "/var/log/6music.log",
+			LogFilePerm: 0644,
+			WorkDir:     "/var/empty/",
+			Umask:       022,
+		}
+
+		d, err := cntxt.Reborn()
+		if err != nil {
+			log.Fatal("Unable to run: ", err)
+		}
+		if d != nil {
+			return
+		}
+		defer cntxt.Release()
 	}
 
-	d, err := cntxt.Reborn()
-	if err != nil {
-		log.Fatal("Unable to run: ", err)
-	}
-	if d != nil {
-		return
-	}
-	defer cntxt.Release()
 	starttime = time.Now()
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	if !strings.HasPrefix(sourceurl, "http") {
