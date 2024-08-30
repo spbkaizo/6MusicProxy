@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "6musicproxy.fullname" . }}
+  labels:
+    {{- include "6musicproxy.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: 8888
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "6musicproxy.selectorLabels" . | nindent 4 }}

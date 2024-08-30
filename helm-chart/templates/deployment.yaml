@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "6musicproxy.fullname" . }}
+  labels:
+    {{- include "6musicproxy.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "6musicproxy.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "6musicproxy.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: PID_FILE
+              value: "{{ .Values.env.PID_FILE }}"
+            - name: LOG_FILE
+              value: "{{ .Values.env.LOG_FILE }}"
+            - name: WORK_DIR
+              value: "{{ .Values.env.WORK_DIR }}"
+            - name: UMASK
+              value: "{{ .Values.env.UMASK }}"
+          ports:
+            - containerPort: 8888
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}

@@ -1,0 +1,54 @@
+replicaCount: 1
+
+image:
+  repository: ghcr.io/spbkaizo/6musicproxy
+  pullPolicy: IfNotPresent
+  tag: "main"
+
+env:
+  PID_FILE: /var/run/6musicproxy.pid
+  LOG_FILE: /var/log/6musicproxy.log
+  WORK_DIR: /var/empty/
+  UMASK: 022
+
+service:
+  type: ClusterIP
+  port: 8888
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: 6musicproxy.local
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls: []
+
+serviceAccount:
+  create: true
+  name: ""
+
+resources: {}
+
+livenessProbe:
+  httpGet:
+    path: /
+    port: 8888
+readinessProbe:
+  httpGet:
+    path: /
+    port: 8888
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}

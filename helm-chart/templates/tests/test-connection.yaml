@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "6musicproxy.fullname" . }}-test-connection"
+  labels:
+    {{- include "6musicproxy.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: wget
+      image: busybox
+      command: ['wget']
+      args: ['{{ include "6musicproxy.fullname" . }}:{{ .Values.service.port }}']
+  restartPolicy: Never
