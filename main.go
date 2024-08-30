@@ -315,17 +315,38 @@ func fileHandler(w http.ResponseWriter, req *http.Request) {
 
 func main() {
 	daemonFlag := flag.Bool("d", false, "Run as a daemon")
+	pidFile := flag.String("pidfile", "/var/run/6music.pid", "Path to the PID file")
+	logFile := flag.String("logfile", "/var/log/6music.log", "Path to the log file")
+	workDir := flag.String("workdir", "/var/empty/", "Working directory")
+	umask := flag.Int("umask", 022, "Umask for the daemon")
 	flag.Parse()
+
+	// Override with environment variables if set
+	if envPidFile := os.Getenv("PID_FILE"); envPidFile != "" {
+		*pidFile = envPidFile
+	}
+	if envLogFile := os.Getenv("LOG_FILE"); envLogFile != "" {
+		*logFile = envLogFile
+	}
+	if envWorkDir := os.Getenv("WORK_DIR"); envWorkDir != "" {
+		*workDir = envWorkDir
+	}
+	if envUmask := os.Getenv("UMASK"); envUmask != "" {
+		umaskVal, err := strconv.ParseInt(envUmask, 8, 0)
+		if err == nil {
+			*umask = int(umaskVal)
+		}
+	}
 
 	var cntxt *daemon.Context
 	if *daemonFlag {
 		cntxt = &daemon.Context{
-			PidFileName: "/var/run/6music.pid",
+			PidFileName: *pidFile,
 			PidFilePerm: 0644,
-			LogFileName: "/var/log/6music.log",
+			LogFileName: *logFile,
 			LogFilePerm: 0644,
-			WorkDir:     "/var/empty/",
-			Umask:       022,
+			WorkDir:     *workDir,
+			Umask:       int(*umask),
 		}
 
 		d, err := cntxt.Reborn()
