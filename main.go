@@ -286,13 +286,13 @@ func getPlaylist(u *url.URL) error {
 						log.Fatalf("ERROR: Creating /tmp directory failed: %v", err)
 					}
 				}
-
-				tmpFile := filepath.Join(tmpDir, filepath.Base(statefile))
-				err = ioutil.WriteFile(tmpFile, state, 0644)
+				// Update statefile to point to /tmp location
+				statefile = filepath.Join(tmpDir, filepath.Base(statefile))
+				err = ioutil.WriteFile(statefile, state, 0644)
 				if err != nil {
-					log.Fatalf("ERROR: Writing statefile in /tmp %v (%v)", tmpFile, err)
+					log.Fatalf("ERROR: Writing statefile in /tmp %v (%v)", statefile, err)
 				} else {
-					log.Printf("INFO: Statefile written to /tmp as %v", tmpFile)
+					log.Printf("INFO: Statefile written to /tmp as %v", statefile)
 				}
 			}
 		}
