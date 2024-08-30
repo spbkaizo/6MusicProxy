@@ -5,7 +5,7 @@ FROM scratch
 COPY 6MusicProxy /6MusicProxy
 
 # Set the binary as the entry point
-ENTRYPOINT ["/6MusicProxy"]
+ENTRYPOINT ["/6MusicProxy/6MusicProxy"]
 
 # Define environment variables (optional)
 ENV PID_FILE=/var/run/6music.pid
