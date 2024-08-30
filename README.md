@@ -19,6 +19,10 @@ which used to drive me mad!
 2. Give that user ownership of the files /var/log/6music.log, /var/db/sequence.dat, /var/run/6music.pid
 3. Run the command as that user, e.g. doas -u 6musicproxy 6MusicProxy
 
+# Docker 
+
+There is an alpha quality docker image.
+
 # Log file format 
 
 ```
