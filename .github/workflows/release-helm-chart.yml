@@ -36,5 +36,6 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: ./helm-chart-*.tgz
+          tag_name: v0.1.0-${{ steps.vars.outputs.sha }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
