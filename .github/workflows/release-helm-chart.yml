@@ -30,7 +30,10 @@ jobs:
           git push origin v0.1.0-${{ steps.vars.outputs.sha }}
 
       - name: Package Helm chart
-        run: helm package ./helm-chart
+        run: |
+          cd helm-chart
+          helm package .
+          mv *.tgz ../
 
       - name: Upload Helm chart as release asset
         uses: softprops/action-gh-release@v1
