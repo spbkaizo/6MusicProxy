@@ -2,7 +2,11 @@
 Expand the name of the chart.
 */}}
 {{- define "6musicproxy.fullname" -}}
-{{- printf "%s-%s" .Release.Name .Chart.Name | trunc 63 | trimSuffix "-" -}}
+{{- $name := printf "%s-%s" .Release.Name .Chart.Name | trunc 63 | trimSuffix "-" -}}
+{{- if not (regexMatch "^[a-z]([-a-z0-9]*[a-z0-9])?$" $name) -}}
+{{- $name = printf "proxy-%s" .Chart.Name | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+{{- $name | lower -}}
 {{- end -}}
 
 {{/*
