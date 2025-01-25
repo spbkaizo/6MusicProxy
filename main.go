@@ -26,7 +26,9 @@ import (
 	"github.com/spbkaizo/m3u8"
 )
 
-var sourceurl = "http://as-hls-uk-live.akamaized.net/pool_904/live/uk/bbc_6music/bbc_6music.isml/bbc_6music-audio%3d320000.norewind.m3u8"
+// if this is failing, check https://gist.github.com/bpsib/67089b959e4fa898af69fea59ad74bc3 - and hope they're not coming for 
+// these streams...
+var sourceurl = "http://as-hls-ww-live.akamaized.net/pool_81827798/live/ww/bbc_6music/bbc_6music.isml/bbc_6music-audio=96000.m3u8"
 var client = &http.Client{}
 var tracks []string
 var useragent = "VLC/3.0.8 LibVLC/3.0.8"
